@@ -6,7 +6,7 @@ const getDataForDashboard = async(req, res) => {
         const findTotalPackages = await PackageSchema.countDocuments()
         const findTotalCategories = await PackageCategorySchema.countDocuments()
         
-        if(!findTotalPackages || !findTotalCategories){
+        if(findTotalPackages === 0 && findTotalCategories === 0){
             return res.status(404).json({status:false, message: "No data found for dashboard"})
         }
         res.status(200).json({status:true, message:"Data fetch successfully", totalPackages: findTotalPackages, findTotalCategories: findTotalCategories})
