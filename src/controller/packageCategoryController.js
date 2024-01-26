@@ -2,7 +2,8 @@ const { getPagination } = require("../helper/utils");
 const PackageCategorySchema = require("../models/PackageCategorySchema");
 const PackageSchema = require("../models/PackageSchema");
 
-
+const LIVE_BASE_URL =  process.env.LIVE_BASE_URL;
+const LOCAL_BASE_URL = process.env.LOCAL_BASE_URL;
 const addNewCategoryForSticker = async(req, res, next) => {
     try{
         const body = req.body;
@@ -39,8 +40,6 @@ const getPackageCategoryList = async(req, res) => {
 
         let query = {}
         if(searchById){
-            // const escapedSearchName = searchById.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$g');
-            // query.category = {$regex: new RegExp(escapedSearchName, 'i')}
             query._id = searchById
         }
         
@@ -58,16 +57,13 @@ const getPackageCategoryList = async(req, res) => {
         // }
 
         if(searchById){
-            let categoryArray = [];
             let packageArray = [];
-            let stickersArray = [];
             const { limit: packageLimit, offset: packageOffset } = getPagination(page, size || 10);
             const findPackage = await PackageSchema.find({ category_id: searchById }).skip(packageOffset).limit(packageLimit);
             
             if(!findPackage || findPackage.length === 0 ){
                 return res.status(404).json({status:false, message:`No data to show`})
             }
-            // const findCat = await PackageCategorySchema.find(query).select('-__v -updated_date').skip(categoryOffset).limit(categoryLimit || 20)
             const findTotalStickers = await PackageSchema.countDocuments({category_id: searchById })
             for(const package of findPackage){
                 const categoryId = package._id; 
@@ -77,7 +73,6 @@ const getPackageCategoryList = async(req, res) => {
                 const findCategory = await PackageCategorySchema.findOne({_id:package.category_id })
                 
                 const categoryName = findCategory.category
-                // const stickersForPackage = package.stickers.slice(stickersOffset, stickersOffset + stickersLimit)
                 const stickersForPackage = package.stickers.slice(0,5)
 
                
@@ -96,7 +91,6 @@ const getPackageCategoryList = async(req, res) => {
                     total_stickers: totalStickers,
                     stickers: stickersForPackage,
                 });
-                const packagesForCategory = await PackageSchema.find({ category_id: categoryId })//.skip(packageLimit).limit(packageOffset);
                 
             }
             res.status(200).json({ status: true, message: "Category packages fetch successfully", packages: packageArray });
@@ -108,11 +102,11 @@ const getPackageCategoryList = async(req, res) => {
                 const categoryId = category._id
                 
                 const totalPackages = await PackageSchema.countDocuments({category_id: categoryId})
-                
+                const imageUrl = `${LIVE_BASE_URL}/src/uploads/${category.category_image}`
                 categoryArray.push({
                     _id: category._id,
                     category_name: category.category,
-                    category_image: category.category_image,
+                    category_image: imageUrl,
                     total_packages: totalPackages,
                 })
             }
@@ -152,11 +146,11 @@ const getHomepageCategoryAndPackageList = async(req, res) => {
         for(const category of findCategory){
             const categoryId = category._id;
             const countTotalPackage = await PackageSchema.countDocuments({category_id:categoryId})
-          
+            const imageUrl = `${LIVE_BASE_URL}/src/uploads/${category.category_image}`
             categoryArray.push({
                 _id: category._id,
                 category_name: category.category,
-                category_image: category.category_image,
+                category_image: imageUrl,
                 total_packages: countTotalPackage
             })
         }
