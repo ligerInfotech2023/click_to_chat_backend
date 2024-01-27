@@ -82,21 +82,23 @@ const getPackageCategoryList = async(req, res) => {
         
         }else{
 
-            const categoryArray = await Promise.all(
-            findCategory.map(async(category) => {
-                const totalPackages = await PackageSchema.countDocuments({category_id: category._id})
+          const [findCategory, totalPackages] = await Promise.all([
+            PackageCategorySchema.find().skip(offset).limit(limit).select('-__v -created_date -updated_date').lean(),
+            PackageSchema.aggregate([
+            { $group: { _id: '$category_id', total_packages: { $sum: 1 } } },
+            ]),
+        ]);
+            const categoryArray = findCategory.map((category) => {
+                const totalPackagesForCategory = totalPackages.find((p) => p._id.toString() === category._id.toString());
                 const imageUrl = `${LIVE_BASE_URL}/src/uploads/${category.category_image}`;
-
-                return{
-                    _id: category._id,
-                    category_name: category.category,
-                    category_image: imageUrl,
-                    total_packages: totalPackages
-                }
-            })
-        )
-
-            res.status(200).json({status: true, message:"Category fetch successfully", category: categoryArray})
+                return {
+                _id: category._id,
+                category_name: category.category,
+                category_image: imageUrl,
+                total_packages: totalPackagesForCategory?.total_packages || 0, // Handle potential missing packages
+                };
+            })    
+            res.status(200).json({ status: true, message: "Category fetch successfully", category: categoryArray });
         }
 
     }catch(err){
