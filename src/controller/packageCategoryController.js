@@ -84,7 +84,7 @@ const getPackageCategoryList = async(req, res) => {
                     total_packages: findTotalStickers,
                     identifier: package.identifier,
                     publisher: package.publisher,
-                    tray_image_file:`${LIVE_BASE_URL}/src/uploads/${encodeURIComponent(findCategory.category)}/${encodeURIComponent(package.package_name)}/${package.tray_image_file}`,
+                    tray_image_file:`${LIVE_BASE_URL}/src/uploads/${encodeURIComponent(findCategory.category)}/${encodeURIComponent(package.package_name)}/tray_image/${package.tray_image_file}`,
                     size: package.size,
                     isPremium: package.isPremium,
                     country: package.country,
