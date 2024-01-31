@@ -21,7 +21,13 @@ const packageSchema = new mongoose.Schema(
         stickers:[
             {
                 sticker_title: String,
-                sticker_url: String,
+                sticker_url: [
+                    {
+                        originalname: String,
+                        filename: String,
+                        path: String,
+                    },
+                ],
                 emojis: Array,
                 sticker_keyword: Array,
                 animated: {type: Boolean, default:false},  

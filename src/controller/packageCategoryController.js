@@ -63,21 +63,38 @@ const getPackageCategoryList = async(req, res) => {
             const findCategory = await PackageCategorySchema.findOne({_id:searchById }).lean()
             const findTotalStickers = await PackageSchema.countDocuments({category_id: searchById })
 
-            const packageArray = findPackage.map((package) => ({
-                id: package._id,
-                package_name: package.package_name,
-                category: findCategory.category,
-                total_packages: findTotalStickers,
-                identifier: package.identifier,
-                publisher: package.publisher,
-                tray_image_file: package.tray_image_file,
-                size: package.size,
-                isPremium: package.isPremium,
-                country: package.country,
-                // package_keyword: package.package_keyword,
-                stickers: package.stickers.slice(0,5)
-            }))
-
+            const packageArray = findPackage.map((package) => {
+                const { limit: stickerLimit, offset: stickerOffset } = getPagination(page, size || 5);
+                const updatedStickers = package.stickers.slice(stickerOffset, stickerOffset + stickerLimit).map((st) => ({
+                    sticker_title: st.sticker_title,
+                    sticker_url: st.sticker_url.map((data) => {
+                        const relativePath = data.path.split('click_to_chat_backend').pop().replace(/\\/g, '/');
+                        return `${LIVE_BASE_URL}${relativePath}`;
+                    })[0],
+                    emojis: st.emojis,
+                    sticker_keyword: st.sticker_keyword,
+                    animated: st.animated,
+                    _id: st._id
+                }));
+                const slicedStickers = updatedStickers.slice(0, 5);
+                const packObj = {
+                    id: package._id,
+                    package_name: package.package_name,
+                    category: findCategory.category,
+                    total_packages: findTotalStickers,
+                    identifier: package.identifier,
+                    publisher: package.publisher,
+                    tray_image_file:`${LIVE_BASE_URL}/src/uploads/${encodeURIComponent(findCategory.category)}/${encodeURIComponent(package.package_name)}/${package.tray_image_file}`,
+                    size: package.size,
+                    isPremium: package.isPremium,
+                    country: package.country,
+                    stickers: slicedStickers,
+                    // stickers: package.stickers.slice(0,5)
+                };
+            
+                return packObj;
+            });
+            
             res.status(200).json({ status: true, message: "Category packages fetch successfully", packages: packageArray });
         
         }else{
@@ -90,7 +107,7 @@ const getPackageCategoryList = async(req, res) => {
         ]);
             const categoryArray = findCategory.map((category) => {
                 const totalPackagesForCategory = totalPackages.find((p) => p._id.toString() === category._id.toString());
-                const imageUrl = `${LIVE_BASE_URL}/src/uploads/${category.category_image}`;
+                const imageUrl = `${LIVE_BASE_URL}/src/uploads/${encodeURIComponent(category.category)}/${encodeURIComponent(category.category_image)}`;
                 return {
                 _id: category._id,
                 category_name: category.category,
@@ -131,27 +148,50 @@ const getHomepageCategoryAndPackageList = async(req, res) => {
                 .lean()
         ]);
 
-        const categoryArray = findCategory.map(category => ({
-            _id: category._id,
-            category_name: category.category,
-            category_image: `${LIVE_BASE_URL}/src/uploads/${category.category_image}`,
-            total_packages: findPackage.filter(pkg => pkg.category_id && pkg.category_id._id.equals(category._id)).length
-        }));
-
-        const packageArray = findPackage.map(package => ({
-            _id: package._id,
-            package_name: package.package_name,
-            identifier: package.identifier,
-            publisher: package.publisher,
-            tray_image_file: package.tray_image_file,
-            size: package.size,
-            isPremium: package.isPremium,
-            country: package.country,
-            // package_keyword: package.package_keyword,
-            total_stickers: package.stickers.length,
-            category: package.category_id ? package.category_id.category : "",
-            stickers: package.stickers.slice(0, 5)
-        }));
+        let catObj = {}
+        const categoryArray = findCategory.map(category => {
+            catObj = {
+                _id: category._id,
+                category_name: category.category,
+                category_image: `${LIVE_BASE_URL}/src/uploads/${encodeURIComponent(category.category)}/${category.category_image}`,
+                total_packages: findPackage.filter(pkg => pkg.category_id && pkg.category_id._id.equals(category._id)).length
+            }
+            return catObj
+        });
+        const packageArray = findPackage.map(package => {
+            const updatedStickers = package.stickers.slice(0,5).map((st) => {
+                
+                const obj = {
+                    sticker_title: st.sticker_title,
+                    sticker_url: st.sticker_url.map((data) => {
+                        const relativePath = data.path.split('click_to_chat_backend').pop().replace(/\\/g, '/');
+                        return `${LIVE_BASE_URL}${relativePath}`;
+                    })[0],
+                    emojis: st.emojis,
+                    sticker_keyword: st.sticker_keyword,
+                    animated: st.animated,
+                    _id: st._id
+                }
+                return obj;
+            });
+            
+            const packObj = {
+                _id: package._id,
+                package_name: package.package_name,
+                identifier: package.identifier,
+                publisher: package.publisher,
+                tray_image_file:`${LIVE_BASE_URL}/src/uploads/${encodeURIComponent(package.category_id.category)}/${encodeURIComponent(package.package_name)}/tray_image/${package.tray_image_file}`,
+                size: package.size,
+                isPremium: package.isPremium,
+                country: package.country,
+                // package_keyword: package.package_keyword,
+                total_stickers: package.stickers.length,
+                category: package.category_id ? package.category_id.category : "",
+                stickers: updatedStickers,
+                // stickers: package.stickers.slice(0, 5)
+            }
+            return packObj;
+        });
 
         if((page === '1' && categoryArray.length === 0) || (page === '2' && packageArray.length === 0)){
             return res.status(404).json({status:false, message:"No data to show"})

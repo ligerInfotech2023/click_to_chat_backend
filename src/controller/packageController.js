@@ -1,8 +1,10 @@
 const { getPagination } = require("../helper/utils");
 const PackageCategorySchema = require("../models/PackageCategorySchema");
 const PackageSchema = require("../models/PackageSchema");
+const path = require('path')
 
-
+const LIVE_BASE_URL =  process.env.LIVE_BASE_URL;
+const LOCAL_BASE_URL = process.env.LOCAL_BASE_URL;
 
 const addNewPackageAndSticker = async(req, res) => {
     try{
@@ -11,6 +13,13 @@ const addNewPackageAndSticker = async(req, res) => {
         // if(findPackage || findPackage){
         //     return res.status(400).json({status:false, message: `Package: ${body.package_name} is already exists`})
         // }
+
+        const stickerImages = req.files.sticker_url.map((file) => ({
+            originalname: file.originalname,
+            filename: file.filename,
+            path: file.path,
+            size: file.size
+        }))
 
         let stickerCategory;
         stickerCategory = await PackageCategorySchema.findOne({category: body.package_category})
@@ -23,32 +32,38 @@ const addNewPackageAndSticker = async(req, res) => {
         let existingPackage = await PackageSchema.findOne({package_name:body.package_name});
 
         if(existingPackage){
-            existingPackage.stickers.push(...body.stickers)
+            // existingPackage.stickers.push(...body.stickers)
+            const addData = stickerImages.map((stickerImage) => ({
+                sticker_title: body.sticker_title,
+                sticker_url: stickerImage,
+                emojis: body && body.emojis ? body.emojis : [],
+                animated: body && body.animated ? body.animated : false,
+                sticker_keyword: body && body.sticker_keyword ? body.sticker_keyword : []
+            }))
+            existingPackage.stickers.push(...addData)
             const updatePackage = await existingPackage.save()
 
             return res.status(200).json({status:true, message: `Stickers added to package ${existingPackage.package_name} successfully`,})
         }
-
 
         const createNewPackage = {
             package_name: body.package_name,
             category_id: stickerCategory._id,
             identifier: body && body.identifier ? body.identifier : null,
             publisher: body && body.publisher ? body.publisher : null,
-            tray_image_file: body && body.tray_image_file ? body.tray_image_file : null,
+            // tray_image_file: body.tray_image_file,
+            tray_image_file: req.files.tray_image_file[0] ? req.files.tray_image_file[0].filename : null,
             size: body && body.size ? body.size : null, 
             package_keyword: body && body.package_keyword ? body.package_keyword : [],
             isPremium: body && body.isPremium ?  body.isPremium : false,
             country: body && body.country ? body.country : [],
-            stickers: body && Array.isArray(body.stickers) 
-                    ? body.stickers.map((sticker) => ({
-                        sticker_title: sticker.sticker_title,
-                        sticker_url: sticker.sticker_url,
-                        emojis: sticker && sticker.emojis ? sticker.emojis : [],
-                        animated: sticker && sticker.animated ? sticker.animated : false,
-                        sticker_keyword: sticker && sticker.sticker_keyword ? sticker.sticker_keyword : []
-                    }))
-                    :null
+            stickers: stickerImages.map((stickerImage) => ({
+                sticker_title: body.sticker_title,
+                sticker_url: stickerImage,
+                emojis: body && body.emojis ? body.emojis : ['😄', '😀'],
+                animated: body && body.animated ? body.animated : false,
+                sticker_keyword: body && body.sticker_keyword ? body.sticker_keyword : []
+            }))
         }
 
         const addNewPackage = await PackageSchema.create(createNewPackage)
@@ -102,14 +117,17 @@ const getStickerPackageList = async(req, res) => {
                 let stickersArray = [];
 
                 for(const stickers of stickerPackage.stickers){
+                    const stickerUrl = stickers.sticker_url.map((data) => {
+                        const stickerUrlPath = data.path.split('click_to_chat_backend').pop().replace(/\\/g, '/');
+                        return `${LIVE_BASE_URL}${stickerUrlPath}`
+                    })[0]
                     stickersArray.push({
                         _id: stickers._id,
                         sticker_title: stickers.sticker_title,
-                        sticker_url: stickers.sticker_url,
+                        sticker_url: stickerUrl,
                         emojis: stickers.emojis,
                         sticker_keyword: stickers.sticker_keyword,
                         animated: stickers.animated,
-                        // isPremium: stickers.isPremium,
                     });
                 }
                 packageArray.push({
