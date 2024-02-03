@@ -1,39 +1,51 @@
 const multer = require('multer')
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs').promises;
+const sharp = require('sharp')
 
 
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
+    destination: async(req, file, cb) => {
+        const packageName = req.body.package_name;
+        const categoryName = req.body.package_category;
         
-        if(file.fieldname === 'sticker_url'){
-            const packageName = req.body.package_name;
-            const categoryName = req.body.package_category;
-            const uploadDir = path.join(__dirname, `../uploads/${categoryName}`, packageName)
-
-            //check if dir is exists not if not then created
-            if(!fs.existsSync(uploadDir)){
-                fs.mkdirSync(uploadDir, {recursive: true})
-            }
-            cb(null, uploadDir)
-        }
-        else if(file.fieldname === 'tray_image_file'){
+        try{      
+            let uploadDir;
+            if(file.fieldname === 'sticker_url'){
+                uploadDir = path.join(__dirname, `../uploads/${categoryName}`, packageName)
     
-            const packageName = req.body.package_name;
-            const categoryName = req.body.package_category;
-            const trayUploadDir = path.join(__dirname , `../uploads/${categoryName}/${packageName}/`, 'tray_image')
-            if(!fs.existsSync(trayUploadDir)){
-                fs.mkdirSync(trayUploadDir, {recursive: true})
+                //check if dir is exists not if not then created
+                // if(!fs.existsSync(uploadDir)){
+                //     fs.mkdirSync(uploadDir, {recursive: true})
+                // }
+                //cb(null, uploadDir)
+
+            } else if(file.fieldname === 'tray_image_file'){
+                uploadDir = path.join(__dirname , `../uploads/${categoryName}/${packageName}/`, 'tray_image')
+
+                // if(!fs.existsSync(trayUploadDir)){
+                //     fs.mkdirSync(trayUploadDir, {recursive: true})
+                // }
+                // cb(null, trayUploadDir)
             }
-            cb(null, trayUploadDir)
+
+            //Check if directory is exists or not if not then create it
+            try{
+                await fs.access(uploadDir)
+            }catch(err){
+                try {
+                    await fs.mkdir(uploadDir, { recursive: true });
+                } catch (mkdirError) {
+                    return cb(mkdirError);
+                }
+            }
+            cb(null, uploadDir);
+        }catch(err){
+            cb(`Error while uploading file`,err);
         }
     },
     filename: (req, file, cb) => {
-        if (file.fieldname === 'sticker_url') {
-            cb(null, file.originalname);
-        } else if (file.fieldname === 'tray_image_file') {
-            cb(null, file.originalname);
-        }
+        cb(null, file.originalname);
     }
 })
 
@@ -54,49 +66,87 @@ const upload  = multer({
     ])
 
 const checkFileType = (file, cb) => {
-    if (file.fieldname === 'sticker_url') {
-        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-        const maxSize = 5 * 1024 * 1024 //5MB
-   
-        // for(const fileData of file){
+        if (file.fieldname === 'sticker_url') {
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/.gif'];
+                if(!allowedTypes.includes(file.mimetype)){
+                    return cb(new Error(`Invalid sticker image file type: ${file.originalname}, only jpeg, jpg, png or gif files are allowed`));
+                    
+                }
+            cb(null, true);
+        } else if (file.fieldname === 'tray_image_file') {
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png',]
             if(!allowedTypes.includes(file.mimetype)){
-                //Remove uploaded file
-                fs.unlinkSync(file.path);
-                return res.status(400).json({ status: false, message: `Invalid file type: ${file.originalname}` });
+                return cb(new Error(`Invalid tray image file type: ${file.originalname}  allowed types is jpg, jpeg or png`));
             }
-            // if(fileData.size > maxSize){
-            //     //Remove uploaded file
-            //     fs.unlinkSync(fileData.path);
-            //     return res.status(400).json({ status: false, message: `File too large: ${fileData.originalname}` });
-            // }
-        // }
-    } else if (file.fieldname === 'tray_image_file') {
-        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png']
-        const maxSize = 5 * 1024 * 1024; //5mb
-        if(!allowedTypes.includes(file.mimetype)){
-            fs.unlinkSync(file.path);
-            return res.status(400).json({status:false, message: `Invalid file type: ${file.originalname}`})
+
+            cb(null, true)
         }
-        // if(file.size > maxSize){
-        //     //Remove uploaded file
-        //     fs.unlinkSync(file.path);
-        //     return res.status(400).json({ status: false, message: `File too large: ${file.originalname}` });
-        // }
+    }  
+
+const validateSticker = async (file) => {
+    const maxSize = 100 * 1024; // 100KB
+    const requiredDimensions = { width: 512, height: 512 };
+
+    if (file.size > maxSize) {
+        return `Error processing sticker file ${file.originalname}: Sticker file size is too large`;
     }
-    cb(null, true)
-}
 
+    const metadata = await sharp(file.path).metadata();
+    const { width, height } = metadata;
 
-// Use the combined middleware in your route/controller
-const uploadPackStickerMiddleware = (req, res, next) => {
-    upload(req, res, (err) => {
+    if (width !== requiredDimensions.width || height !== requiredDimensions.height) {
+        return `One or more stickers have incorrect dimensions (512x512 required)`;
+    }
+
+    return null; // Validation passed
+};
+
+const validateTrayImage = async (file) => {
+    const maxSize = 50 * 1024; // 50KB
+    const maxDimensions = { width: 96, height: 96 };
+
+    if (file.size > maxSize) {
+        return `Tray file size is too large: ${file.originalname}, Please select less than 50KB file`;
+    }
+
+    const metadata = await sharp(file.path).metadata();
+    const { width, height } = metadata;
+
+    if (width !== maxDimensions.width || height !== maxDimensions.height) {
+        return `Tray image dimension exceeds allowed size: ${maxDimensions.width}x${maxDimensions.height}`;
+    }
+
+    return null; // Validation passed
+};
+
+const uploadPackStickerMiddleware = async (req, res, next) => {
+    upload(req, res, async (err) => {
         if (err) {
-            // Handle upload error
             return res.status(400).json({ status: false, message: 'Failed to upload files of tray image and sticker', error: err.message });
         }
 
-        // Access uploaded files as req.files.profile and req.files.sticker_url
-        next();
+        const errors = [];
+
+        try {
+            // Validate stickers
+            const stickersValidation = await Promise.all(req.files.sticker_url.map(validateSticker));
+            errors.push(...stickersValidation.filter((error) => error !== null));
+
+            // Validate tray image
+            const trayImageValidation = await Promise.all(req.files.tray_image_file.map(validateTrayImage));
+            errors.push(...trayImageValidation.filter((error) => error !== null));
+
+            // If any validation errors, throw an error and delete all files:
+            if (errors.length > 0) {
+                await Promise.all(req.files.sticker_url.map(async (file) => await fs.unlink(file.path)));
+                await Promise.all(req.files.tray_image_file.map(async (file) => await fs.unlink(file.path)));
+                return res.status(400).json({ status: false, message: errors.join('\n') });
+            }
+
+            next();
+        } catch (error) {
+            return res.status(500).json({ status: false, message: 'Error processing files', error: error.message });
+        }
     });
 };
 

@@ -64,8 +64,7 @@ const getPackageCategoryList = async(req, res) => {
             const findTotalStickers = await PackageSchema.countDocuments({category_id: searchById })
 
             const packageArray = findPackage.map((package) => {
-                const { limit: stickerLimit, offset: stickerOffset } = getPagination(page, size || 5);
-                const updatedStickers = package.stickers.slice(stickerOffset, stickerOffset + stickerLimit).map((st) => ({
+                const updatedStickers = package.stickers.map((st) => ({
                     sticker_title: st.sticker_title,
                     sticker_url: st.sticker_url.map((data) => {
                         const relativePath = data.path.split('click_to_chat_backend').pop().replace(/\\/g, '/');
@@ -84,7 +83,7 @@ const getPackageCategoryList = async(req, res) => {
                     total_packages: findTotalStickers,
                     identifier: package.identifier,
                     publisher: package.publisher,
-                    tray_image_file:`${LIVE_BASE_URL}/src/uploads/${encodeURIComponent(findCategory.category)}/${encodeURIComponent(package.package_name)}/tray_image/${package.tray_image_file}`,
+                    tray_image_file:`${LIVE_BASE_URL}/src/uploads/${encodeURIComponent(findCategory.category)}/${encodeURIComponent(package.package_name)}/tray_image/${encodeURIComponent(package.tray_image_file)}`,
                     size: package.size,
                     isPremium: package.isPremium,
                     country: package.country,
@@ -138,7 +137,7 @@ const getHomepageCategoryAndPackageList = async(req, res) => {
         }
 
         const [findCategory, countTotalCategory, findPackage] = await Promise.all([
-            PackageCategorySchema.find().skip(offset).limit(limit).select('-__v -created_date -updated_date').lean(),
+            PackageCategorySchema.find().limit(10).select('-__v -created_date -updated_date').lean(),
             PackageCategorySchema.countDocuments(),
             PackageSchema.find(findQuery)
                 .populate({ path: "category_id", model: "tbl_package_category", select: "category" })
@@ -192,21 +191,15 @@ const getHomepageCategoryAndPackageList = async(req, res) => {
             }
             return packObj;
         });
-
-        if((page === '1' && categoryArray.length === 0) || (page === '2' && packageArray.length === 0)){
-            return res.status(404).json({status:false, message:"No data to show"})
-        }
-        else if(page === '1'){
-            res.status(200).json({status:true, message: "Data fetch successfully", totalCategory:countTotalCategory, categories: categoryArray,packages: packageArray})
-        }
-        else if(page === '2'){
-            res.status(200).json({status:true, message:"Data fetch successfully", packages: packageArray})
+   
+        if (page == 1) {
+            res.status(200).json({ status: true, message: "Data fetch successfully", totalCategory: countTotalCategory, categories: categoryArray, packages: packageArray });
         } 
-        else if(page > 2){
-            res.status(404).json({ status: false, message: "No data to show" });
-        }
-        else{
-            res.status(200).json({status:true, message: "Data fetch successfully", categories: categoryArray, packages: packageArray})
+        else if (page > 1) {
+            res.status(200).json({ status: true, message: "Data fetch successfully", packages: packageArray });
+        } 
+        else {
+            res.status(200).json({ status: true, message: "Data fetch successfully", categories: categoryArray, packages: packageArray });
         }
 
     }catch(err){
