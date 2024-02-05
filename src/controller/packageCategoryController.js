@@ -68,7 +68,8 @@ const getPackageCategoryList = async(req, res) => {
                     sticker_title: st.sticker_title,
                     sticker_url: st.sticker_url.map((data) => {
                         const relativePath = data.path.split('click_to_chat_backend').pop().replace(/\\/g, '/');
-                        return `${LIVE_BASE_URL}${relativePath}`;
+                        const encodedPath = relativePath.split('/').map(encodeURIComponent).join('/')
+                        return `${LIVE_BASE_URL}${encodedPath}`;
                     })[0],
                     emojis: st.emojis,
                     sticker_keyword: st.sticker_keyword,
@@ -152,7 +153,7 @@ const getHomepageCategoryAndPackageList = async(req, res) => {
             catObj = {
                 _id: category._id,
                 category_name: category.category,
-                category_image: `${LIVE_BASE_URL}/src/uploads/${encodeURIComponent(category.category)}/${category.category_image}`,
+                category_image: `${LIVE_BASE_URL}/src/uploads/${encodeURIComponent(category.category)}/${encodeURIComponent(category.category_image)}`,
                 total_packages: findPackage.filter(pkg => pkg.category_id && pkg.category_id._id.equals(category._id)).length
             }
             return catObj
@@ -164,7 +165,8 @@ const getHomepageCategoryAndPackageList = async(req, res) => {
                     sticker_title: st.sticker_title,
                     sticker_url: st.sticker_url.map((data) => {
                         const relativePath = data.path.split('click_to_chat_backend').pop().replace(/\\/g, '/');
-                        return `${LIVE_BASE_URL}${relativePath}`;
+                        const encodedPath = relativePath.split('/').map(encodeURIComponent).join('/')
+                        return `${LIVE_BASE_URL}${encodedPath}`;
                     })[0],
                     emojis: st.emojis,
                     sticker_keyword: st.sticker_keyword,
@@ -179,7 +181,7 @@ const getHomepageCategoryAndPackageList = async(req, res) => {
                 package_name: package.package_name,
                 identifier: package.identifier,
                 publisher: package.publisher,
-                tray_image_file:`${LIVE_BASE_URL}/src/uploads/${encodeURIComponent(package.category_id.category)}/${encodeURIComponent(package.package_name)}/tray_image/${package.tray_image_file}`,
+                tray_image_file:`${LIVE_BASE_URL}/src/uploads/${encodeURIComponent(package.category_id.category)}/${encodeURIComponent(package.package_name)}/tray_image/${encodeURIComponent(package.tray_image_file)}`,
                 size: package.size,
                 isPremium: package.isPremium,
                 country: package.country,

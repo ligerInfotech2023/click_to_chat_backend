@@ -119,7 +119,8 @@ const getStickerPackageList = async(req, res) => {
                 for(const stickers of stickerPackage.stickers){
                     const stickerUrl = stickers.sticker_url.map((data) => {
                         const stickerUrlPath = data.path.split('click_to_chat_backend').pop().replace(/\\/g, '/');
-                        return `${LIVE_BASE_URL}${stickerUrlPath}`
+                        const encodedPath = stickerUrlPath.split('/').map(encodeURIComponent).join('/')
+                        return `${LIVE_BASE_URL}${encodedPath}`
                     })[0]
                     stickersArray.push({
                         _id: stickers._id,
