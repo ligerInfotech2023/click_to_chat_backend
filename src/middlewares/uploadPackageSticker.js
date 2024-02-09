@@ -13,20 +13,10 @@ const storage = multer.diskStorage({
             let uploadDir;
             if(file.fieldname === 'sticker_url'){
                 uploadDir = path.join(__dirname, `../uploads/${categoryName}`, packageName)
-    
-                //check if dir is exists not if not then created
-                // if(!fs.existsSync(uploadDir)){
-                //     fs.mkdirSync(uploadDir, {recursive: true})
-                // }
-                //cb(null, uploadDir)
 
             } else if(file.fieldname === 'tray_image_file'){
                 uploadDir = path.join(__dirname , `../uploads/${categoryName}/${packageName}/`, 'tray_image')
-
-                // if(!fs.existsSync(trayUploadDir)){
-                //     fs.mkdirSync(trayUploadDir, {recursive: true})
-                // }
-                // cb(null, trayUploadDir)
+                
             }
 
             //Check if directory is exists or not if not then create it
@@ -128,12 +118,15 @@ const uploadPackStickerMiddleware = async (req, res, next) => {
         const errors = [];
 
         try {
-            // Validate stickers
-            const stickersValidation = await Promise.all(req.files.sticker_url.map(validateSticker));
+
+            const stickersValidation = await Promise.all(
+
+                req.files.sticker_url ? req.files.sticker_url.map(validateSticker) : []
+                );
             errors.push(...stickersValidation.filter((error) => error !== null));
 
-            // Validate tray image
-            const trayImageValidation = await Promise.all(req.files.tray_image_file.map(validateTrayImage));
+
+            const trayImageValidation = await Promise.all(req.files.tray_image_file ? req.files.tray_image_file.map(validateTrayImage) : []);
             errors.push(...trayImageValidation.filter((error) => error !== null));
 
             // If any validation errors, throw an error and delete all files:
@@ -145,6 +138,7 @@ const uploadPackStickerMiddleware = async (req, res, next) => {
 
             next();
         } catch (error) {
+            console.log("Error: ",error);
             return res.status(500).json({ status: false, message: 'Error processing files', error: error.message });
         }
     });

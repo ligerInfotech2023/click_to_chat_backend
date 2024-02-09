@@ -14,12 +14,12 @@ const addNewPackageAndSticker = async(req, res) => {
         //     return res.status(400).json({status:false, message: `Package: ${body.package_name} is already exists`})
         // }
 
-        const stickerImages = req.files.sticker_url.map((file) => ({
+        const stickerImages =  req.files.sticker_url ? req.files.sticker_url.map((file) => ({
             originalname: file.originalname,
             filename: file.filename,
             path: file.path,
             size: file.size
-        }))
+        })) : []
 
         let stickerCategory;
         stickerCategory = await PackageCategorySchema.findOne({category: body.package_category})
@@ -36,7 +36,7 @@ const addNewPackageAndSticker = async(req, res) => {
             const addData = stickerImages.map((stickerImage) => ({
                 sticker_title: body.sticker_title,
                 sticker_url: stickerImage,
-                emojis: body && body.emojis ? body.emojis : [],
+                emojis: body && body.emojis ? body.emojis : ['😄', '😀'],
                 animated: body && body.animated ? body.animated : false,
                 sticker_keyword: body && body.sticker_keyword ? body.sticker_keyword : []
             }))
@@ -87,6 +87,7 @@ const getStickerPackageList = async(req, res) => {
         const searchById = req.query.id;
         const country = req.query.country;
         const {limit, offset } = getPagination(page, size || 20)
+        const getAll = req.query.package;
         let query = {}
         if(searchById){
             // const escapedSearchName = searchById.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$g');
@@ -102,7 +103,10 @@ const getStickerPackageList = async(req, res) => {
         if(!findStickerPackage || findStickerPackage.length === 0){
             return res.status(404).json({status:false, message:"No data to show"})
         }
-        
+        if(getAll && getAll.toLowerCase() === 'all'){
+            const packages = await PackageSchema.find().select('package_name').populate('category_id');
+            return res.status(200).json({ status: true, message: "Sticker package fetch successfully", packages: packages });
+        }
         if(searchById){
             let packageArray = []
 
@@ -149,27 +153,79 @@ const getStickerPackageList = async(req, res) => {
             res.status(200).json({status:true, message:"Sticker package fetch successfully", packages:packageArray})
          }
          else{
-            let packageArray = [];
-            for(const packages of findStickerPackage){
-                const categoryId = packages.category_id;
-                const totalStickers = packages.stickers.length;
-                const findCategory = await PackageCategorySchema.findById({_id:categoryId}).select('category')
-                packageArray.push({
-                    _id: packages._id,
-                    package_name: packages.package_name,
-                    identifier: packages.identifier,
-                    publisher: packages.publisher,
-                    tray_image_file: `${LIVE_BASE_URL}/src/uploads/${encodeURIComponent(findCategory.category)}/${encodeURIComponent(packages.package_name)}/tray_image/${encodeURIComponent(packages.tray_image_file)}`,
-                    size: packages.size,
-                    isPremium: packages.isPremium,
-                    country: packages.country,
-                    package_keyword: packages.package_keyword,
-                    total_stickers: totalStickers,
-                    category: findCategory.category,
-
-                })
+            const packagePage = parseInt(req.query.packagePage) || 1;
+            const packageSize = parseInt(req.query.packageSize) || 10;
+            const stickersPage = parseInt(req.query.stickersPage) || 1;
+            const stickersSize = parseInt(req.query.stickersSize) || 10;
+            const packageId = req.query.packageid;
+            let packages ;
+            if(packageId){
+                packages = await PackageSchema.find({_id:packageId});
+            }else{
+                packages = await PackageSchema.find().skip((packagePage - 1) * packageSize).limit(packageSize).populate('category_id');
             }
 
+            let packageArray = await Promise.all(packages.map(async (pkg) => {
+                const {
+                    category_id,
+                    _id,
+                    package_name,
+                    identifier,
+                    publisher,
+                    tray_image_file,
+                    size,
+                    isPremium,
+                    country,
+                    package_keyword,
+                    stickers
+                } = pkg;
+                // const stickerData = await Promise.all(stickers.slice((stickersPage - 1) * stickersSize, stickersPage * stickersSize)
+                const stickerData = await Promise.all(stickers
+                    .map(async (sticker) => {
+                        const {
+                            _id,
+                            sticker_title,
+                            emojis,
+                            sticker_keyword,
+                            animated,
+                            sticker_url
+                        } = sticker;
+                    
+                
+                    const stickerUrl = await Promise.all(sticker_url.map(async (data) => {
+                        const relativePath = data.path.split('click_to_chat_backend').pop().replace(/\\/g, '/');
+                        const encodedPath = relativePath.split('/').map(encodeURIComponent).join('/');
+                        return `${LIVE_BASE_URL}${encodedPath}`;
+                    }));
+            
+                    return {
+                        _id,
+                        sticker_title,
+                        sticker_url: stickerUrl[0],
+                        emojis,
+                        sticker_keyword,
+                        animated,
+                    };
+                }));
+
+                const { category } = await PackageCategorySchema.findById(category_id).select('category');
+            
+                return {
+                    _id,
+                    package_name,
+                    identifier,
+                    publisher,
+                    tray_image_file: `${LIVE_BASE_URL}/src/uploads/${encodeURIComponent(category)}/${encodeURIComponent(package_name)}/tray_image/${encodeURIComponent(tray_image_file)}`,
+                    size,
+                    isPremium,
+                    country,
+                    package_keyword,
+                    total_stickers: stickers.length,
+                    category,
+                    stickers: stickerData,
+                };
+            }));
+            
             res.status(200).json({ status: true, message: "Sticker package fetch successfully", packages: packageArray });
          }
     }catch(err){
