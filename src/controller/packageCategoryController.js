@@ -146,6 +146,7 @@ const getHomepageCategoryAndPackageList = async(req, res) => {
                 .skip(offset)
                 .limit(limit)
                 .select('-__v -created_date -updated_date')
+                .sort({ created_date: -1 })
                 .lean()
         ]);
 
@@ -159,7 +160,7 @@ const getHomepageCategoryAndPackageList = async(req, res) => {
             }
             return catObj
         });
-        const packageArray = findPackage.map(package => {
+        const packageArrayData = findPackage.map(package => {
             const updatedStickers = package.stickers.slice(0,5).map((st) => {
                 
                 const obj = {
@@ -194,7 +195,13 @@ const getHomepageCategoryAndPackageList = async(req, res) => {
             }
             return packObj;
         });
-   
+
+        const newestRecords = packageArrayData.shift()
+
+        const shuffleRecords = shuffle(packageArrayData)
+
+        const packageArray = [newestRecords, ...shuffleRecords]
+
         if (page == 1) {
             res.status(200).json({ status: true, message: "Data fetch successfully", totalCategory: countTotalCategory, categories: categoryArray, packages: packageArray });
         } 
@@ -209,6 +216,23 @@ const getHomepageCategoryAndPackageList = async(req, res) => {
         console.log('Error while get sticker and category list: ',err);
         res.status(500).json({status:false, message:"Internal server error while fetching sticker category and package list", error: err.message})
     }
+}
+
+const shuffle = (array) => {
+    let currentIndex = array.length, randomIndex;
+
+    // While there remain elements to shuffle...
+    while (currentIndex !== 0) {
+
+        // Pick a remaining element...
+        randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex--;
+
+        // And swap it with the current element.
+        [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+    }
+
+    return array;
 }
 
 module.exports = { 
